@@ -7,9 +7,8 @@ Defensive checker for AI model files: detects the container format
 embedded in the file header region, and verifies model files against a
 hash manifest so tampered or swapped weights are caught before loading.
 
-Applied coursework for Red Team Leaders AI model reverse-engineering study —
-used here defensively: know exactly which model bytes you are about to run.
-It never executes model code.
+Applied coursework, used here defensively: know exactly which model bytes you
+are about to run. It never executes model code.
 
 ## Install
 
