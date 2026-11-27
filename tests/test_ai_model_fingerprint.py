@@ -1,6 +1,7 @@
 import hashlib
 import json
 
+from ai_model_fingerprint import cli
 from ai_model_fingerprint.fingerprint import detect_format, fingerprint, verify_manifest
 
 
@@ -31,3 +32,40 @@ def test_verify_manifest_ok_and_mismatch(tmp_path):
     bad = {str(p): "0" * 64}
     assert verify_manifest(bad)
     assert verify_manifest({str(tmp_path / "nope.bin"): "0" * 64})
+
+
+
+
+def test_fingerprint_streams_large_file(tmp_path):
+    target = tmp_path / "model.gguf"
+    payload = b"GGUF" + b"x" * (2 * 1024 * 1024)
+    target.write_bytes(payload)
+    result = fingerprint(target)
+    assert result.size == len(payload)
+    assert result.sha256 == hashlib.sha256(payload).hexdigest()
+    assert result.format == "GGUF"
+
+
+def test_verify_manifest_is_case_insensitive(tmp_path):
+    target = tmp_path / "model.bin"
+    target.write_bytes(b"weights")
+    digest = hashlib.sha256(b"weights").hexdigest().upper()
+    assert verify_manifest({str(target): digest}) == []
+
+
+def test_verify_manifest_rejects_directory_and_bad_digest(tmp_path):
+    problems = verify_manifest({str(tmp_path): "abc", "x.bin": 42})
+    assert any(p.startswith("missing:") for p in problems)
+    assert any(p.startswith("invalid digest") for p in problems)
+
+
+def test_cli_missing_file_is_usage_error(capsys):
+    assert cli.main(["/nonexistent/model.gguf"]) == cli.EXIT_USAGE
+    assert "cannot read" in capsys.readouterr().err
+
+
+def test_cli_invalid_manifest_json_is_usage_error(tmp_path, capsys):
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text("{not json", encoding="utf-8")
+    assert cli.main(["--verify", str(manifest)]) == cli.EXIT_USAGE
+    assert "invalid JSON" in capsys.readouterr().err
